@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f3efe8" />
+  <meta name="description" content="一个可以随手写下内容、看看留下的痕迹，并在焦虑时安静一会儿的私人空间。" />
+  <title>Tiny Evidence 1.0</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <button class="round-btn menu-btn" id="menuButton" aria-label="打开菜单" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="brand">
+        <p class="eyebrow" id="dateLabel"></p>
+        <h1>Tiny Evidence</h1>
+      </div>
+      <button class="round-btn" id="themeButton" aria-label="切换主题">☾</button>
+    </header>
+
+    <aside class="drawer" id="drawer" aria-hidden="true">
+      <div class="drawer-backdrop" data-close-drawer></div>
+      <div class="drawer-panel">
+        <div class="drawer-head">
+          <div>
+            <p class="eyebrow">Menu</p>
+            <h2>功能菜单</h2>
+          </div>
+          <button class="round-btn" data-close-drawer aria-label="关闭菜单">×</button>
+        </div>
+
+        <nav class="drawer-nav">
+          <button class="drawer-item active" data-view="home">
+            <span class="drawer-icon">⌂</span>
+            <span><b>首页</b><small>这里没有需要完成的事情</small></span>
+          </button>
+          <button class="drawer-item" data-view="write">
+            <span class="drawer-icon">＋</span>
+            <span><b>写点东西</b><small>把已经发生的内容放在这里</small></span>
+          </button>
+          <button class="drawer-item" data-view="traces">
+            <span class="drawer-icon">✦</span>
+            <span><b>我的痕迹</b><small>看看曾经留下的内容</small></span>
+          </button>
+          <button class="drawer-item" data-view="quiet">
+            <span class="drawer-icon">○</span>
+            <span><b>安静空间</b><small>焦虑或烦躁时使用</small></span>
+          </button>
+          <button class="drawer-item" data-view="suggestion">
+            <span class="drawer-icon">◇</span>
+            <span><b>一个小建议</b><small>有空闲时再主动打开</small></span>
+          </button>
+        </nav>
+
+        <div class="drawer-foot">
+          <button class="plain-btn" id="exportButton">导出我的内容</button>
+          <button class="plain-btn danger" id="clearButton">清空全部内容</button>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <section class="view active" id="view-home">
+        <div class="pet-home">
+          <div class="pet-scene">
+            <div class="scene-window"><div class="scene-sky"></div><div class="scene-cloud cloud-a"></div><div class="scene-cloud cloud-b"></div></div>
+            <div class="room-item item-book" id="item-book" hidden>📘</div>
+            <div class="room-item item-plant" id="item-plant" hidden>🪴</div>
+            <div class="room-item item-lamp" id="item-lamp" hidden>💡</div>
+            <div class="room-item item-art" id="item-art" hidden>🖼️</div>
+            <div class="room-item item-ball" id="item-ball" hidden>⚽</div>
+            <div class="room-item item-letter" id="item-letter" hidden>💌</div>
+            <button class="pet-character" id="petCharacter" aria-label="摸摸宠物">
+              <span class="pet-shadow"></span>
+              <span class="pet-body">
+                <span class="pet-wing wing-left"></span><span class="pet-wing wing-right"></span>
+                <span class="pet-eye eye-left"></span><span class="pet-eye eye-right"></span>
+                <span class="pet-beak"></span><span class="pet-cheek cheek-left"></span><span class="pet-cheek cheek-right"></span>
+              </span>
+            </button>
+            <div class="pet-sparkles" id="petSparkles"></div>
+          </div>
+          <div class="pet-status">
+            <p class="eyebrow">Your Little Companion</p>
+            <h2 id="petNameDisplay">小团</h2>
+            <p id="petStateText">它正在安静地看看窗外。</p>
+            <button class="text-link" id="renamePetButton">给它改个名字</button>
+          </div>
+          <div class="hero-actions pet-actions">
+            <button class="primary-btn" data-go="write">写下一点东西</button>
+            <button class="soft-btn" data-go="quiet">我现在有点焦虑</button>
+            <button class="soft-btn" data-go="suggestion">给我一个小建议</button>
+          </div>
+        </div>
+        <button class="memory-card" id="memoryCard" hidden>
+          <span class="memory-icon">✦</span>
+          <span><small>偶然翻到以前的一条内容</small><b id="memoryText"></b></span>
+        </button>
+        <div class="home-links"><button class="text-link" data-go="traces">看看以前留下的内容 →</button></div>
+      </section>
+
+      <section class="view" id="view-write">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Write</p>
+            <h2>写点东西</h2>
+            <p class="muted">不需要总结，也不需要说明它有什么意义。</p>
+          </div>
+        </div>
+
+        <form id="noteForm" class="note-form">
+          <textarea id="noteText" maxlength="1200" required
+            placeholder="想放在这里的内容……"></textarea>
+
+          <details class="optional-details">
+            <summary>添加更多信息（可选）</summary>
+            <div class="optional-grid">
+              <label>
+                <span>心情</span>
+                <select id="noteMood">
+                  <option value="">不记录</option>
+                  <option>轻松</option>
+                  <option>平静</option>
+                  <option>普通</option>
+                  <option>烦躁</option>
+                  <option>焦虑</option>
+                  <option>低落</option>
+                </select>
+              </label>
+              <label>
+                <span>类型</span>
+                <select id="noteType">
+                  <option value="随手记">随手记</option>
+                  <option>已经做过的事</option>
+                  <option>一个想法</option>
+                  <option>值得留下的瞬间</option>
+                </select>
+              </label>
+            </div>
+          </details>
+
+          <div class="form-actions">
+            <button class="primary-btn" type="submit">放在这里</button>
+            <button class="text-link" type="button" data-go="home">暂时不写了</button>
+          </div>
+        </form>
+
+        <div class="save-result" id="saveResult" hidden>
+          <div class="save-spark">✦</div>
+          <h3>这条内容已经被放在这里。</h3>
+          <p>你可以继续写，也可以离开。</p>
+          <div class="form-actions">
+            <button class="soft-btn" id="writeAnotherButton">再写一条</button>
+            <button class="text-link" data-go="home">回到首页</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-traces">
+        <div class="section-head traces-head">
+          <div>
+            <p class="eyebrow">My Traces</p>
+            <h2>我的痕迹</h2>
+            <p class="muted">有内容的日子会被点亮。空白日不代表任何事情。</p>
+          </div>
+          <label class="display-select">
+            <span>显示方式</span>
+            <select id="calendarMode">
+              <option value="calendar">完整日历</option>
+              <option value="collection">只看留下的日子</option>
+              <option value="hidden">暂时隐藏日历</option>
+            </select>
+          </label>
+        </div>
+
+        <section class="calendar-card" id="calendarSection">
+          <div class="calendar-toolbar">
+            <button class="round-btn small" id="prevMonth" aria-label="上个月">‹</button>
+            <h3 id="monthTitle"></h3>
+            <button class="round-btn small" id="nextMonth" aria-label="下个月">›</button>
+          </div>
+          <div class="weekday-row">
+            <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+          </div>
+          <div class="calendar-grid" id="calendarGrid"></div>
+          <p class="calendar-caption">颜色只表示不同类型的记录，不代表多少或好坏。</p>
+        </section>
+
+        <section class="collection-grid" id="collectionGrid" hidden></section>
+
+        <section class="gentle-visuals">
+          <article class="visual-card">
+            <div class="visual-head">
+              <div>
+                <p class="eyebrow">Collection</p>
+                <h3>留下的内容</h3>
+              </div>
+              <strong id="noteTotal">0</strong>
+            </div>
+            <div class="type-bars" id="typeBars"></div>
+          </article>
+
+          <article class="visual-card">
+            <div class="visual-head">
+              <div>
+                <p class="eyebrow">Mood Notes</p>
+                <h3>记录过的心情</h3>
+              </div>
+            </div>
+            <div class="mood-cloud" id="moodCloud"></div>
+          </article>
+        </section>
+
+        <div class="notes-head">
+          <h3>以前写过的内容</h3>
+          <select id="noteFilter">
+            <option value="全部">全部</option>
+            <option>随手记</option>
+            <option>已经做过的事</option>
+            <option>一个想法</option>
+            <option>值得留下的瞬间</option>
+          </select>
+        </div>
+        <div class="notes-list" id="notesList"></div>
+        <div class="empty-state" id="notesEmpty">
+          <span>✦</span>
+          <h3>这里还没有内容</h3>
+          <p>第一条可以很短。</p>
+        </div>
+      </section>
+
+      <section class="view" id="view-quiet">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Quiet Space</p>
+            <h2>安静空间</h2>
+            <p class="muted">不需要完成练习，也不需要在结束后评价自己。</p>
+          </div>
+        </div>
+
+        <div class="quiet-menu" id="quietMenu">
+          <button class="quiet-option" data-quiet="breathe">
+            <span>○</span><b>跟随呼吸一会儿</b><small>30 秒、1 分钟或 2 分钟</small>
+          </button>
+          <button class="quiet-option" data-quiet="dump">
+            <span>〰</span><b>把脑中的东西写下来</b><small>不整理，也不必保存</small>
+          </button>
+          <button class="quiet-option" data-quiet="ground">
+            <span>⌾</span><b>做一个简单的着地练习</b><small>重新注意周围和身体</small>
+          </button>
+          <button class="quiet-option" data-quiet="still">
+            <span>·</span><b>只是安静待一会儿</b><small>页面不会要求你做什么</small>
+          </button>
+        </div>
+
+        <section class="quiet-panel" id="quiet-breathe" hidden>
+          <button class="text-link back-quiet">← 返回</button>
+          <div class="breathing-wrap">
+            <div class="breathing-circle" id="breathingCircle">
+              <span id="breathingText">准备好时开始</span>
+            </div>
+            <div class="duration-row">
+              <button data-duration="30">30 秒</button>
+              <button data-duration="60" class="active">1 分钟</button>
+              <button data-duration="120">2 分钟</button>
+            </div>
+            <button class="primary-btn" id="breathingButton">开始</button>
+            <button class="text-link" id="stopBreathingButton">随时停止</button>
+          </div>
+        </section>
+
+        <section class="quiet-panel" id="quiet-dump" hidden>
+          <button class="text-link back-quiet">← 返回</button>
+          <div class="quiet-card">
+            <h3>可以把脑中很吵的内容放在这里。</h3>
+            <p class="muted">不需要整理，也不需要得出结论。</p>
+            <textarea id="dumpText" maxlength="1800" placeholder="随便写……"></textarea>
+            <div class="form-actions">
+              <button class="soft-btn" id="saveDumpButton">保存到我的痕迹</button>
+              <button class="text-link" id="clearDumpButton">不保存并清空</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="quiet-panel" id="quiet-ground" hidden>
+          <button class="text-link back-quiet">← 返回</button>
+          <div class="grounding-card">
+            <p class="eyebrow">Grounding</p>
+            <h3 id="groundingTitle">看看周围</h3>
+            <p id="groundingText">找到 3 个你能看到的东西。不需要写下来。</p>
+            <div class="grounding-dots">
+              <span class="active"></span><span></span><span></span>
+            </div>
+            <button class="primary-btn" id="nextGroundingButton">下一步</button>
+          </div>
+        </section>
+
+        <section class="quiet-panel" id="quiet-still" hidden>
+          <button class="text-link back-quiet">← 返回</button>
+          <div class="still-space">
+            <div class="slow-light"></div>
+            <p>你可以在这里待一会儿。</p>
+            <small>不需要做任何事。</small>
+          </div>
+        </section>
+      </section>
+
+      <section class="view" id="view-suggestion">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">A Small Suggestion</p>
+            <h2>给我一个小建议</h2>
+            <p class="muted">只有你主动打开时才会出现。它不是任务，也不会留下未完成记录。</p>
+          </div>
+        </div>
+
+        <div class="suggestion-settings">
+          <button class="time-choice active" data-time="1">1 分钟以内</button>
+          <button class="time-choice" data-time="5">5 分钟以内</button>
+          <button class="time-choice" data-time="15">15 分钟以内</button>
+          <button class="time-choice" data-time="challenge">稍微挑战一下</button>
+        </div>
+        <button class="primary-btn" id="drawSuggestionButton">给我一个建议</button>
+
+        <article class="suggestion-card" id="suggestionCard" hidden>
+          <p class="eyebrow" id="suggestionTime"></p>
+          <h3 id="suggestionTitle"></h3>
+          <p id="suggestionText"></p>
+          <div class="form-actions">
+            <button class="primary-btn" id="completeSuggestionButton">已完成</button>
+            <button class="soft-btn" id="anotherSuggestionButton">换一个</button>
+            <button class="text-link" id="shrinkSuggestionButton">再小一点</button>
+            <button class="text-link" data-go="home">不需要了</button>
+          </div>
+          <div class="suggestion-complete" id="suggestionComplete" hidden>
+            <div class="completion-spark">✦</div><h3>完成了。</h3>
+            <p id="suggestionCompleteText">它看起来有点开心。</p>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div class="day-modal" id="renameModal" hidden>
+    <div class="modal-backdrop" data-close-rename></div>
+    <section class="modal-card rename-card">
+      <div class="modal-head"><div><p class="eyebrow">Name</p><h3>给它取个名字</h3></div><button class="round-btn" data-close-rename>×</button></div>
+      <form id="renamePetForm"><input id="petNameInput" maxlength="12" placeholder="输入名字" />
+        <div class="form-actions"><button class="primary-btn" type="submit">保存名字</button><button class="text-link" type="button" data-close-rename>取消</button></div>
+      </form>
+    </section>
+  </div>
+
+  <div class="day-modal" id="dayModal" hidden>
+    <div class="modal-backdrop" data-close-day></div>
+    <section class="modal-card">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow" id="dayModalDate"></p>
+          <h3>这一天留下的内容</h3>
+        </div>
+        <button class="round-btn" data-close-day>×</button>
+      </div>
+      <div id="dayModalList" class="notes-list"></div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

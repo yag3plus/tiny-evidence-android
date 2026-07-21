@@ -1,0 +1,9 @@
+{
+  "name": "Tiny Evidence",
+  "short_name": "Tiny Evidence",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f3efe8",
+  "theme_color": "#f3efe8",
+  "description": "一个带有无惩罚虚拟小伙伴、轻量记录、可视化日历和安静空间的私人网页。"
+}
