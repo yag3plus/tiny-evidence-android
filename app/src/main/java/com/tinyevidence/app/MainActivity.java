@@ -13,6 +13,7 @@ import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.ValueCallback;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
@@ -25,9 +26,11 @@ import java.nio.charset.StandardCharsets;
 public class MainActivity extends Activity {
     private static final int CREATE_EXPORT_FILE = 1001;
     private static final int NOTIFICATION_PERMISSION_REQUEST = 1002;
+    private static final int OPEN_IMPORT_FILE = 1003;
     private WebView webView;
     private String pendingExportJson;
     private String pendingInteraction;
+    private ValueCallback<Uri[]> pendingFileChooserCallback;
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override
@@ -44,7 +47,47 @@ public class MainActivity extends Activity {
         webView.getSettings().setDatabaseEnabled(true);
         webView.getSettings().setAllowFileAccess(true);
         webView.getSettings().setAllowContentAccess(true);
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(
+                    WebView webView,
+                    ValueCallback<Uri[]> filePathCallback,
+                    FileChooserParams fileChooserParams
+            ) {
+                if (pendingFileChooserCallback != null) {
+                    pendingFileChooserCallback.onReceiveValue(null);
+                }
+                pendingFileChooserCallback = filePathCallback;
+
+                Intent intent;
+                try {
+                    intent = fileChooserParams.createIntent();
+                } catch (Exception e) {
+                    intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("application/json");
+                }
+
+                intent.setAction(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("application/json");
+                intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{
+                        "application/json",
+                        "text/json",
+                        "text/plain",
+                        "application/octet-stream"
+                });
+
+                try {
+                    startActivityForResult(intent, OPEN_IMPORT_FILE);
+                    return true;
+                } catch (Exception e) {
+                    pendingFileChooserCallback = null;
+                    Toast.makeText(MainActivity.this, "无法打开文件选择器", Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+            }
+        });
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -140,6 +183,19 @@ public class MainActivity extends Activity {
                 Toast.makeText(this, "导出失败", Toast.LENGTH_SHORT).show();
             }
             pendingExportJson = null;
+            return;
+        }
+
+        if (requestCode == OPEN_IMPORT_FILE) {
+            if (pendingFileChooserCallback == null) return;
+
+            Uri[] results = null;
+            if (resultCode == RESULT_OK && data != null) {
+                results = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+            }
+
+            pendingFileChooserCallback.onReceiveValue(results);
+            pendingFileChooserCallback = null;
         }
     }
 
