@@ -1,12 +1,14 @@
 package com.tinyevidence.app;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -15,13 +17,17 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import org.json.JSONObject;
+
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 public class MainActivity extends Activity {
     private static final int CREATE_EXPORT_FILE = 1001;
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 1002;
     private WebView webView;
     private String pendingExportJson;
+    private String pendingInteraction;
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override
@@ -33,7 +39,6 @@ public class MainActivity extends Activity {
 
         webView = new WebView(this);
         setContentView(webView);
-
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setDomStorageEnabled(true);
         webView.getSettings().setDatabaseEnabled(true);
@@ -48,9 +53,31 @@ public class MainActivity extends Activity {
                 startActivity(new Intent(Intent.ACTION_VIEW, uri));
                 return true;
             }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                openPendingInteraction();
+            }
         });
         webView.addJavascriptInterface(new AndroidBridge(), "AndroidBridge");
+        pendingInteraction = getIntent().getStringExtra("interaction");
         webView.loadUrl("file:///android_asset/web/index.html");
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        pendingInteraction = intent.getStringExtra("interaction");
+        openPendingInteraction();
+    }
+
+    private void openPendingInteraction() {
+        if (webView == null || pendingInteraction == null) return;
+        String safe = "morning".equals(pendingInteraction) ? "morning" : "evening";
+        webView.evaluateJavascript("window.openSleepInteraction && window.openSleepInteraction('" + safe + "');", null);
+        pendingInteraction = null;
     }
 
     public class AndroidBridge {
@@ -69,6 +96,32 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void showMessage(String message) {
             runOnUiThread(() -> Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show());
+        }
+
+        @JavascriptInterface
+        public String getReminderSettings() {
+            return ReminderScheduler.getSettingsJson(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public void saveReminderSettings(String json) {
+            runOnUiThread(() -> {
+                try {
+                    JSONObject obj = new JSONObject(json);
+                    ReminderScheduler.saveSettings(MainActivity.this, obj);
+                    ReminderScheduler.scheduleAll(MainActivity.this);
+                    requestNotificationPermissionIfNeeded();
+                    Toast.makeText(MainActivity.this, "提醒设置已经保存", Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "提醒设置保存失败", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    }
+
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_REQUEST);
         }
     }
 

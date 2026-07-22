@@ -42,6 +42,18 @@
             <span class="drawer-icon">＋</span>
             <span><b>写点东西</b><small>把已经发生的内容放在这里</small></span>
           </button>
+          <button class="drawer-item" data-view="share">
+            <span class="drawer-icon">☀</span>
+            <span><b>想告诉你一件事</b><small>分享一件刚刚做过的小事</small></span>
+          </button>
+          <button class="drawer-item" data-view="pending">
+            <span class="drawer-icon">≡</span>
+            <span><b>待处理的事情</b><small>整理那些暂时不太想开始的事</small></span>
+          </button>
+          <button class="drawer-item" data-view="sleep">
+            <span class="drawer-icon">☾</span>
+            <span><b>今天可以结束了</b><small>和小团一起完成早晚收尾</small></span>
+          </button>
           <button class="drawer-item" data-view="traces">
             <span class="drawer-icon">✦</span>
             <span><b>我的痕迹</b><small>看看曾经留下的内容</small></span>
@@ -57,7 +69,7 @@
         </nav>
 
         <div class="drawer-foot">
-          <button class="plain-btn" id="exportButton">导出我的内容</button>
+          <button class="plain-btn" data-view="backup">数据与备份</button>
           <button class="plain-btn danger" id="clearButton">清空全部内容</button>
         </div>
       </div>
@@ -157,6 +169,160 @@
             <button class="soft-btn" id="writeAnotherButton">再写一条</button>
             <button class="text-link" data-go="home">回到首页</button>
           </div>
+        </div>
+      </section>
+
+
+      <section class="view" id="view-share">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Share Something</p>
+            <h2>想告诉你一件事</h2>
+            <p class="muted">像分享一样记下来，不需要解释它证明了什么。</p>
+          </div>
+        </div>
+
+        <form id="shareForm" class="note-form">
+          <textarea id="shareText" maxlength="1200" required placeholder="发生了什么？"></textarea>
+
+          <div class="optional-grid share-grid">
+            <label>
+              <span>投入时间（可选）</span>
+              <select id="shareTime">
+                <option value="">不记录时间</option>
+                <option>少于 5 分钟</option>
+                <option>5–15 分钟</option>
+                <option>15–30 分钟</option>
+                <option>30–60 分钟</option>
+                <option>1 小时以上</option>
+              </select>
+            </label>
+            <label>
+              <span>方向（可选）</span>
+              <select id="shareDirection">
+                <option value="">不选择</option>
+                <option>学习</option>
+                <option>创作</option>
+                <option>工作</option>
+                <option>生活整理</option>
+                <option>身体照顾</option>
+                <option>情绪照顾</option>
+                <option>人际联系</option>
+                <option>兴趣探索</option>
+                <option>其他</option>
+              </select>
+            </label>
+          </div>
+
+          <details class="optional-details">
+            <summary>再补充一点（可选）</summary>
+            <div class="optional-grid">
+              <label>
+                <span>当时的心情</span>
+                <select id="shareMood">
+                  <option value="">不记录</option>
+                  <option>轻松</option><option>平静</option><option>普通</option>
+                  <option>烦躁</option><option>焦虑</option><option>低落</option>
+                </select>
+              </label>
+              <label>
+                <span>是否点亮日历</span>
+                <select id="shareCalendar">
+                  <option value="yes">点亮</option>
+                  <option value="no">不点亮</option>
+                </select>
+              </label>
+            </div>
+          </details>
+
+          <div class="form-actions">
+            <button class="primary-btn" type="submit">讲给它听</button>
+            <button class="text-link" type="button" data-go="home">暂时不写了</button>
+          </div>
+        </form>
+
+        <div class="save-result" id="shareResult" hidden>
+          <div class="save-spark">✦</div>
+          <h3>这件事已经讲给它听了。</h3>
+          <p>它安静地听完了。</p>
+          <div class="form-actions">
+            <button class="soft-btn" id="shareAnotherButton">再分享一件</button>
+            <button class="text-link" data-go="home">回到首页</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-pending">
+        <div class="section-head pending-head">
+          <div>
+            <p class="eyebrow">Pending</p>
+            <h2>待处理的事情</h2>
+            <p class="muted">放在这里的，是需要处理、但暂时不太想开始的事情。</p>
+          </div>
+          <button class="primary-btn" id="newPendingButton">添加一件事</button>
+        </div>
+
+        <div class="pending-toolbar">
+          <label>
+            <span>排序</span>
+            <select id="pendingSort">
+              <option value="smart">智能排序</option>
+              <option value="deadline">按截止时间</option>
+              <option value="importance">按重要性</option>
+              <option value="created">按添加时间</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="pendingList" class="pending-list"></div>
+        <div id="pendingEmpty" class="empty-state">
+          <span>≡</span><h3>这里还没有事情</h3><p>可以先放进来一件。</p>
+        </div>
+      </section>
+
+      <section class="view" id="view-sleep">
+        <div class="section-head"><div><p class="eyebrow">Morning & Evening</p><h2>今天可以结束了</h2><p class="muted">早晨一起打开房间，晚上看看今天已经留下了什么。</p></div></div>
+        <div class="sleep-layout">
+          <article class="sleep-scene-card visual-card" id="sleepSceneCard">
+            <div class="sleep-window" id="sleepWindow"><div class="sleep-sky"></div><div class="sleep-curtain curtain-left"></div><div class="sleep-curtain curtain-right"></div><div class="sleep-moon">☾</div><div class="sleep-sun">☀</div></div>
+            <div class="sleep-pet" id="sleepPet">🐧</div><div class="sleep-blanket"></div><div class="sleep-lamp">●</div><p id="sleepSceneText">小团正在房间里等你。</p>
+          </article>
+          <div class="sleep-actions-column">
+            <article class="visual-card"><p class="eyebrow">Morning</p><h3>一起开始今天</h3><p class="muted">完成一个几秒钟的小互动就可以。</p><button class="primary-btn" id="wakePetButton">拉开窗帘，我起床了</button></article>
+            <article class="visual-card"><p class="eyebrow">Evening</p><h3>今天已经留下了这些</h3><div id="todaySummary" class="today-summary"></div>
+              <div class="add-tiny-thing"><label><span>补充一件已经发生的小事（可选）</span><input id="endDayTinyThing" maxlength="240" placeholder="例如：洗了澡、回了一条消息" /></label><button class="soft-btn" id="addEndDayThingButton">加到今天</button></div>
+              <label class="end-note-label"><span>今天到这里，还有什么想说的？（可选）</span><textarea id="endDayNote" maxlength="600" placeholder="可以不写。"></textarea></label>
+              <button class="primary-btn" id="endDayButton">关灯并盖好毯子，我要睡觉了</button><button class="text-link" id="notYetButton">暂时还不想结束</button>
+            </article>
+          </div>
+        </div>
+        <article class="calendar-card sleep-calendar-card"><div class="calendar-toolbar"><button class="round-btn small" id="prevSleepMonth">‹</button><h3 id="sleepMonthTitle"></h3><button class="round-btn small" id="nextSleepMonth">›</button></div><div class="weekday-row"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div class="calendar-grid" id="sleepCalendarGrid"></div><p class="calendar-caption">☀ 表示记录了起床，☾ 表示完成了夜间收尾。空白不代表失败。</p></article>
+        <article class="visual-card mobile-reminder-card" id="mobileReminderCard" hidden><p class="eyebrow">Android Reminders</p><h3>早晚消息</h3><p class="muted">这个设置只在安卓 App 中显示。到时间后，手机会发送“我起床了”或“我要睡觉了”。</p><div class="optional-grid"><label><span>早晨时间</span><input type="time" id="morningReminderTime" value="07:30" /></label><label><span>晚上时间</span><input type="time" id="eveningReminderTime" value="23:30" /></label></div><div class="reminder-switches"><label class="check-row"><input type="checkbox" id="morningReminderEnabled" /><span>开启早晨消息</span></label><label class="check-row"><input type="checkbox" id="eveningReminderEnabled" /><span>开启晚间消息</span></label></div><button class="primary-btn" id="saveReminderSettingsButton">保存提醒设置</button><p class="calendar-caption" id="reminderStatusText"></p></article>
+      </section>
+
+      <section class="view" id="view-backup">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Data & Backup</p>
+            <h2>数据与备份</h2>
+            <p class="muted">导出会包含记录、宠物状态、设置、分享内容和待处理事项。</p>
+          </div>
+        </div>
+        <div class="backup-grid">
+          <article class="visual-card">
+            <h3>导出完整备份</h3>
+            <p class="muted">生成一个 JSON 文件，保存到设备中。</p>
+            <button class="primary-btn" id="exportFullButton">导出备份</button>
+          </article>
+          <article class="visual-card">
+            <h3>导入备份</h3>
+            <p class="muted">可以选择合并现有数据，或用备份替换当前数据。</p>
+            <input type="file" id="importFile" accept=".json,application/json" />
+            <div class="form-actions">
+              <button class="soft-btn" id="mergeImportButton">合并导入</button>
+              <button class="text-link danger-text" id="replaceImportButton">替换当前数据</button>
+            </div>
+          </article>
         </div>
       </section>
 
@@ -345,6 +511,88 @@
     </main>
   </div>
 
+
+  <div class="day-modal" id="pendingModal" hidden>
+    <div class="modal-backdrop" data-close-pending></div>
+    <section class="modal-card">
+      <div class="modal-head">
+        <div><p class="eyebrow">Pending Item</p><h3 id="pendingModalTitle">添加一件待处理的事</h3></div>
+        <button class="round-btn" data-close-pending>×</button>
+      </div>
+      <form id="pendingForm">
+        <input type="hidden" id="pendingId" />
+        <label><span>事情名称</span><input id="pendingTitleInput" required maxlength="120" placeholder="例如：给导师发邮件" /></label>
+        <div class="optional-grid">
+          <label><span>重要性</span>
+            <select id="pendingImportance">
+              <option value="1">低</option><option value="2">中</option><option value="3">高</option><option value="4">非常重要</option>
+            </select>
+          </label>
+          <label><span>截止时间（可选）</span><input type="datetime-local" id="pendingDeadline" /></label>
+        </div>
+        <label><span>当前状态</span>
+          <select id="pendingStatus">
+            <option>还没开始</option><option>已经开始一点</option><option>正在处理</option><option>暂时搁置</option><option>已完成</option>
+          </select>
+        </label>
+        <label><span>备注（可选）</span><textarea id="pendingNotes" maxlength="1000" placeholder="卡在哪里、需要什么、下一步可能是什么……"></textarea></label>
+        <label class="check-row"><input type="checkbox" id="pendingUseBurns" /><span>我想使用反拖延症表帮助自己开始</span></label>
+        <div class="form-actions"><button class="primary-btn" type="submit">保存</button><button class="text-link" type="button" data-close-pending>取消</button></div>
+      </form>
+    </section>
+  </div>
+
+  <div class="day-modal" id="burnsModal" hidden>
+    <div class="modal-backdrop" data-close-burns></div>
+    <section class="modal-card burns-card">
+      <div class="modal-head"><div><p class="eyebrow">Anti-Procrastination Sheet</p><h3 id="burnsTaskTitle">反拖延症表</h3></div><button class="round-btn" data-close-burns>×</button></div>
+      <div class="burns-step active" data-step="setup">
+        <label><span>第一个启动小步骤</span><input id="burnsTinyStep" maxlength="240" placeholder="例如：只打开文档" /></label>
+        <div class="optional-grid">
+          <label><span>预计困难程度：<b id="predDifficultyValue">50</b>%</span><input type="range" id="predDifficulty" min="0" max="100" value="50" /></label>
+          <label><span>预计满意程度：<b id="predSatisfactionValue">50</b>%</span><input type="range" id="predSatisfaction" min="0" max="100" value="50" /></label>
+        </div>
+        <div class="form-actions"><button class="primary-btn" id="burnsStartButton">开始这一步</button><button class="text-link" data-close-burns>暂时不用</button></div>
+      </div>
+      <div class="burns-step" data-step="confirm">
+        <div class="confirmation-card"><p class="eyebrow">现在准备开始</p><h3 id="confirmTinyStep"></h3><div class="comparison-grid"><div class="comparison-item"><small>预计困难</small><h3 id="confirmPredDifficulty"></h3></div><div class="comparison-item"><small>预计满意</small><h3 id="confirmPredSatisfaction"></h3></div></div></div>
+        <div class="form-actions"><button class="primary-btn" id="confirmBurnsStartButton">确定</button><button class="text-link" id="backToBurnsSetupButton">返回修改</button></div>
+      </div>
+      <div class="burns-step" data-step="result">
+        <div class="comparison-card"><p class="eyebrow">启动小步骤</p><h3 id="savedTinyStep"></h3><div class="comparison-grid"><div class="comparison-item"><small>预计困难</small><h3 id="savedPredDifficulty"></h3></div><div class="comparison-item"><small>预计满意</small><h3 id="savedPredSatisfaction"></h3></div></div></div>
+        <div class="optional-grid">
+          <label><span>实际困难程度：<b id="actualDifficultyValue">50</b>%</span><input type="range" id="actualDifficulty" min="0" max="100" value="50" /></label>
+          <label><span>实际满意程度：<b id="actualSatisfactionValue">50</b>%</span><input type="range" id="actualSatisfaction" min="0" max="100" value="50" /></label>
+        </div>
+        <label><span>实际投入时间（可选）</span><input id="burnsActualTime" maxlength="80" placeholder="例如：7 分钟" /></label>
+        <div class="form-actions"><button class="primary-btn" id="burnsCompleteTaskButton">已完成</button><button class="text-link" data-close-burns>先离开</button></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="day-modal" id="feelingModal" hidden>
+    <div class="modal-backdrop"></div>
+    <section class="modal-card feeling-card">
+      <div class="modal-head"><div><p class="eyebrow">Feeling</p><h3>现在感觉怎么样？</h3></div></div>
+      <p class="muted">不需要分析得很完整，选一个最接近的感受就可以。</p>
+      <div class="emoji-rating" id="emojiRating">
+        <button data-score="1" aria-label="很不好">😣<small>1</small></button>
+        <button data-score="2" aria-label="不太好">😕<small>2</small></button>
+        <button data-score="3" aria-label="一般">😐<small>3</small></button>
+        <button data-score="4" aria-label="还不错">🙂<small>4</small></button>
+        <button data-score="5" aria-label="感觉很好">😄<small>5</small></button>
+      </div>
+      <div id="lowFeelingBox" hidden>
+        <p>看起来这次体验不太舒服。</p>
+        <textarea id="feelingNote" placeholder="有什么想说的，可以放在这里。"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="primary-btn" id="saveFeelingButton">保存</button>
+        <button class="text-link" id="skipFeelingButton">暂时不评分</button>
+      </div>
+    </section>
+  </div>
+
   <div class="day-modal" id="renameModal" hidden>
     <div class="modal-backdrop" data-close-rename></div>
     <section class="modal-card rename-card">
@@ -369,6 +617,7 @@
     </section>
   </div>
 
+  <div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="app.js"></script>
 </body>

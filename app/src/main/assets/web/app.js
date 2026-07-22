@@ -15,8 +15,20 @@ function animatePetReward(){const p=$("#petCharacter");p.classList.add("pet-happ
 
 const THEME_KEY = "tiny-evidence-theme";
 const MODE_KEY = "tiny-evidence-calendar-mode";
+const SHARE_KEY = "tiny-evidence-shares-v1";
+const PENDING_KEY = "tiny-evidence-pending-v1";
+const BURNS_KEY = "tiny-evidence-burns-v1";
+const SLEEP_KEY = "tiny-evidence-sleep-v1";
 
 let notes = JSON.parse(localStorage.getItem(NOTES_KEY) || "[]");
+let shares = JSON.parse(localStorage.getItem(SHARE_KEY) || "[]");
+let pendingItems = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+let burnsRecords = JSON.parse(localStorage.getItem(BURNS_KEY) || "[]");
+let activeBurnsTaskId = null;
+let feelingScore = null;
+let pendingCompletionContext = null;
+let sleepRecords = JSON.parse(localStorage.getItem(SLEEP_KEY) || "[]");
+let currentSleepMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let currentMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let noteFilter = "全部";
 let suggestionTime = "1";
@@ -49,6 +61,7 @@ function escapeHtml(v=""){ return v.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt
 function dateKey(v){ const d=new Date(v); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function formatDate(v){ return new Intl.DateTimeFormat("zh-CN",{year:"numeric",month:"long",day:"numeric",weekday:"short"}).format(new Date(v)); }
 function showToast(text){ const t=$("#toast"); t.textContent=text; t.classList.add("show"); clearTimeout(showToast.timer); showToast.timer=setTimeout(()=>t.classList.remove("show"),2200); }
+function launchConfetti(){const layer=$("#confettiLayer");if(!layer)return;layer.innerHTML="";const colors=["#e9bd56","#7fa38a","#8fa7bd","#b48fb7","#d99891"];for(let i=0;i<42;i++){const p=document.createElement("span");p.className="confetti-piece";p.style.left=`${Math.random()*100}%`;p.style.background=colors[Math.floor(Math.random()*colors.length)];p.style.animationDelay=`${Math.random()*.22}s`;p.style.setProperty("--drift",`${(Math.random()-.5)*240}px`);p.style.setProperty("--spin",`${(Math.random()>.5?1:-1)*(360+Math.random()*720)}deg`);layer.appendChild(p)}setTimeout(()=>layer.innerHTML="",1900)}
 
 function openDrawer(){
   $("#drawer").classList.add("open"); $("#drawer").setAttribute("aria-hidden","false");
@@ -66,12 +79,14 @@ function switchView(name){
   $(`#view-${name}`).classList.add("active");
   const item=$(`.drawer-item[data-view="${name}"]`); if(item)item.classList.add("active");
   if(name==="traces") renderTraces();
+  if(name==="pending") renderPending();
+  if(name==="sleep") renderSleepPage();
   if(name==="home") renderMemory();
   window.scrollTo({top:0,behavior:"smooth"});
 }
 $("#menuButton").addEventListener("click",()=>$("#drawer").classList.contains("open")?closeDrawer():openDrawer());
 $$("[data-close-drawer]").forEach(x=>x.addEventListener("click",closeDrawer));
-$(".drawer-nav").addEventListener("click",e=>{ const b=e.target.closest("[data-view]"); if(!b)return; switchView(b.dataset.view); closeDrawer(); });
+$("#drawer").addEventListener("click",e=>{ const b=e.target.closest("[data-view]"); if(!b)return; switchView(b.dataset.view); closeDrawer(); });
 $$("[data-go]").forEach(b=>b.addEventListener("click",()=>switchView(b.dataset.go)));
 
 function renderMemory(){
@@ -102,6 +117,131 @@ $("#noteForm").addEventListener("submit",e=>{
 $("#writeAnotherButton").addEventListener("click",()=>{
   $("#noteForm").reset(); $("#noteForm").hidden=false; $("#saveResult").hidden=true; $("#noteText").focus();
 });
+
+
+function saveShares(){localStorage.setItem(SHARE_KEY,JSON.stringify(shares))}
+function savePending(){localStorage.setItem(PENDING_KEY,JSON.stringify(pendingItems))}
+function saveBurns(){localStorage.setItem(BURNS_KEY,JSON.stringify(burnsRecords))}
+
+$("#shareForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const text=$("#shareText").value.trim(); if(!text)return;
+  const item={id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),createdAt:Date.now(),text,time:$("#shareTime").value,direction:$("#shareDirection").value,mood:$("#shareMood").value,calendar:$("#shareCalendar").value};
+  shares.unshift(item); saveShares();
+  if(item.calendar==="yes"){
+    notes.unshift({id:item.id,createdAt:item.createdAt,text:`想分享的一件事：${item.text}${item.time?`（${item.time}）`:""}${item.direction?` · ${item.direction}`:""}`,mood:item.mood,type:"值得留下的瞬间"});
+    saveNotes();
+  }
+  const rewardMap={"学习":{curiosity:2},"创作":{creativity:2},"工作":{vitality:1},"生活整理":{vitality:1,calm:1},"身体照顾":{vitality:2},"情绪照顾":{calm:2},"人际联系":{connection:2},"兴趣探索":{curiosity:2},"其他":{calm:1}};
+  addPetReward(rewardMap[item.direction]||{connection:1});
+  e.target.hidden=true;$("#shareResult").hidden=false;
+});
+$("#shareAnotherButton").addEventListener("click",()=>{$("#shareForm").reset();$("#shareForm").hidden=false;$("#shareResult").hidden=true;$("#shareText").focus()});
+
+function importanceLabel(v){return ({1:"低",2:"中",3:"高",4:"非常重要"})[v]||"中"}
+function pendingUrgency(item){
+  if(item.status==="已完成")return -999;
+  let score=Number(item.importance||1)*100;
+  if(item.deadline){
+    const diff=(new Date(item.deadline)-Date.now())/86400000;
+    if(diff<0)score+=1000; else if(diff<=1)score+=700; else if(diff<=7)score+=400; else if(diff<=14)score+=200;
+  }
+  return score;
+}
+function formatDeadline(v){
+  if(!v)return"暂无截止时间";
+  const d=new Date(v),diff=(d-Date.now())/86400000;
+  if(diff<0)return"截止时间已过去";
+  if(diff<1)return"今天";
+  if(diff<2)return"明天";
+  if(diff<=7)return"这周内";
+  return new Intl.DateTimeFormat("zh-CN",{month:"long",day:"numeric",hour:"2-digit",minute:"2-digit"}).format(d);
+}
+function renderPending(){
+  const box=$("#pendingList"),empty=$("#pendingEmpty"); box.innerHTML="";
+  let list=pendingItems.filter(item=>item.status!=="已完成"), sort=$("#pendingSort").value;
+  if(sort==="smart")list.sort((a,b)=>pendingUrgency(b)-pendingUrgency(a));
+  if(sort==="deadline")list.sort((a,b)=>(a.deadline?new Date(a.deadline):Infinity)-(b.deadline?new Date(b.deadline):Infinity));
+  if(sort==="importance")list.sort((a,b)=>b.importance-a.importance);
+  if(sort==="created")list.sort((a,b)=>b.createdAt-a.createdAt);
+  empty.style.display=list.length?"none":"grid";
+  list.forEach(item=>{
+    const c=document.createElement("article"); c.className="pending-card";
+    const overdue=item.deadline&&new Date(item.deadline)<new Date()&&item.status!=="已完成";
+    c.innerHTML=`<div class="pending-top"><div><h3>${escapeHtml(item.title)}</h3><p class="muted">${escapeHtml(item.notes||"")}</p></div><button class="text-link" data-edit-pending="${item.id}">编辑</button></div>
+      <div class="pending-tags"><span class="tag">${importanceLabel(item.importance)}</span><span class="tag ${overdue?"deadline-overdue":""}">${formatDeadline(item.deadline)}</span><span class="tag">${escapeHtml(item.status)}</span></div>
+      <div class="pending-actions">
+        <button class="start" data-complete-pending="${item.id}">${item.status==="已完成"?"已完成":"标记完成"}</button>
+        <button class="burns" data-burns="${item.id}">${item.burnsSetup?"查看反拖延症表":"使用反拖延症表"}</button>
+        <button class="ghost" data-delete-pending="${item.id}">删除</button>
+      </div>`;
+    box.appendChild(c);
+  });
+}
+$("#pendingSort").addEventListener("change",renderPending);
+$("#newPendingButton").addEventListener("click",()=>openPendingModal());
+function openPendingModal(item=null){
+  $("#pendingId").value=item?.id||""; $("#pendingModalTitle").textContent=item?"编辑待处理的事":"添加一件待处理的事";
+  $("#pendingTitleInput").value=item?.title||""; $("#pendingImportance").value=item?.importance||2; $("#pendingDeadline").value=item?.deadline||""; $("#pendingStatus").value=item?.status||"还没开始"; $("#pendingNotes").value=item?.notes||""; $("#pendingUseBurns").checked=!!item?.useBurns;
+  $("#pendingModal").hidden=false;
+}
+$$("[data-close-pending]").forEach(x=>x.addEventListener("click",()=>$("#pendingModal").hidden=true));
+$("#pendingForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const id=$("#pendingId").value;
+  const item={id:id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())),createdAt:id?(pendingItems.find(x=>x.id===id)?.createdAt||Date.now()):Date.now(),title:$("#pendingTitleInput").value.trim(),importance:Number($("#pendingImportance").value),deadline:$("#pendingDeadline").value,status:$("#pendingStatus").value,notes:$("#pendingNotes").value.trim(),useBurns:$("#pendingUseBurns").checked};
+  if(id)pendingItems=pendingItems.map(x=>x.id===id?item:x); else pendingItems.unshift(item);
+  savePending(); $("#pendingModal").hidden=true; renderPending();
+  if(item.useBurns&&!id)openBurns(item.id);
+});
+$("#pendingList").addEventListener("click",e=>{
+  const edit=e.target.closest("[data-edit-pending]"); if(edit){openPendingModal(pendingItems.find(x=>x.id===edit.dataset.editPending));return}
+  const del=e.target.closest("[data-delete-pending]"); if(del&&confirm("删除这件事吗？")){pendingItems=pendingItems.filter(x=>x.id!==del.dataset.deletePending);savePending();renderPending();return}
+  const done=e.target.closest("[data-complete-pending]"); if(done){
+    const item=pendingItems.find(x=>x.id===done.dataset.completePending); if(!item||item.status==="已完成")return;
+    item.status="已完成"; item.completedAt=Date.now(); savePending();
+    notes.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),createdAt:Date.now(),text:`完成了待处理的事情：${item.title}`,mood:"",type:"已经做过的事"}); saveNotes(); addPetReward({vitality:2,calm:1}); launchConfetti(); renderPending(); showToast("这件事完成了。"); return;
+  }
+  const burns=e.target.closest("[data-burns]"); if(burns)openBurns(burns.dataset.burns);
+});
+function setBurnsStep(name){$$(".burns-step").forEach(x=>x.classList.toggle("active",x.dataset.step===name))}
+function openBurns(id){activeBurnsTaskId=id;const item=pendingItems.find(x=>x.id===id);if(!item)return;$("#burnsTaskTitle").textContent=item.title||"反拖延症表";if(item.burnsSetup){$("#savedTinyStep").textContent=item.burnsSetup.tinyStep;$("#savedPredDifficulty").textContent=`${item.burnsSetup.predDifficulty}%`;$("#savedPredSatisfaction").textContent=`${item.burnsSetup.predSatisfaction}%`;$("#actualDifficulty").value=50;$("#actualSatisfaction").value=50;$("#actualDifficultyValue").textContent=50;$("#actualSatisfactionValue").textContent=50;$("#burnsActualTime").value="";setBurnsStep("result")}else{$("#burnsTinyStep").value="";$("#predDifficulty").value=50;$("#predSatisfaction").value=50;$("#predDifficultyValue").textContent=50;$("#predSatisfactionValue").textContent=50;setBurnsStep("setup")}$("#burnsModal").hidden=false}
+$$("[data-close-burns]").forEach(x=>x.addEventListener("click",()=>$("#burnsModal").hidden=true));
+[["predDifficulty","predDifficultyValue"],["predSatisfaction","predSatisfactionValue"],["actualDifficulty","actualDifficultyValue"],["actualSatisfaction","actualSatisfactionValue"]].forEach(([a,b])=>$("#"+a).addEventListener("input",e=>$("#"+b).textContent=e.target.value));
+$("#burnsStartButton").addEventListener("click",e=>{e.preventDefault();const t=$("#burnsTinyStep").value.trim();if(!t){showToast("先写下一个启动小步骤。");return}$("#confirmTinyStep").textContent=t;$("#confirmPredDifficulty").textContent=`${$("#predDifficulty").value}%`;$("#confirmPredSatisfaction").textContent=`${$("#predSatisfaction").value}%`;setBurnsStep("confirm")});
+$("#backToBurnsSetupButton").addEventListener("click",()=>setBurnsStep("setup"));
+$("#confirmBurnsStartButton").addEventListener("click",()=>{const item=pendingItems.find(x=>x.id===activeBurnsTaskId);if(!item)return;item.burnsSetup={tinyStep:$("#burnsTinyStep").value.trim(),predDifficulty:Number($("#predDifficulty").value),predSatisfaction:Number($("#predSatisfaction").value),startedAt:Date.now()};if(item.status==="还没开始")item.status="已经开始一点";savePending();$("#burnsModal").hidden=true;renderPending();showToast("启动小步骤已经保存。")});
+$("#burnsCompleteTaskButton").addEventListener("click",()=>{const item=pendingItems.find(x=>x.id===activeBurnsTaskId);if(!item||!item.burnsSetup)return;pendingCompletionContext={taskId:item.id,title:item.title,tinyStep:item.burnsSetup.tinyStep,predDifficulty:item.burnsSetup.predDifficulty,predSatisfaction:item.burnsSetup.predSatisfaction,actualDifficulty:Number($("#actualDifficulty").value),actualSatisfaction:Number($("#actualSatisfaction").value),actualTime:$("#burnsActualTime").value.trim()};feelingScore=null;$$("#emojiRating button").forEach(x=>x.classList.remove("selected"));$("#lowFeelingBox").hidden=true;$("#feelingNote").value="";$("#feelingModal").hidden=false});
+$("#emojiRating").addEventListener("click",e=>{const b=e.target.closest("[data-score]");if(!b)return;feelingScore=Number(b.dataset.score);$$("#emojiRating button").forEach(x=>x.classList.toggle("selected",x===b));$("#lowFeelingBox").hidden=feelingScore>2});
+function finishBurns(skip=false){if(!pendingCompletionContext)return;const item=pendingItems.find(x=>x.id===pendingCompletionContext.taskId);if(!item)return;const rec={id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),taskId:item.id,taskTitle:item.title,createdAt:Date.now(),tinyStep:pendingCompletionContext.tinyStep,predDifficulty:pendingCompletionContext.predDifficulty,predSatisfaction:pendingCompletionContext.predSatisfaction,actualDifficulty:pendingCompletionContext.actualDifficulty,actualSatisfaction:pendingCompletionContext.actualSatisfaction,actualTime:pendingCompletionContext.actualTime,feelingScore:skip?null:feelingScore,feelingNote:skip?"":$("#feelingNote").value.trim()};burnsRecords.unshift(rec);item.status="已完成";item.completedAt=Date.now();item.burnsRecordId=rec.id;saveBurns();savePending();notes.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),createdAt:Date.now(),text:`完成了待处理的事情：${item.title}`,mood:"",type:"已经做过的事",pendingTaskId:item.id,burnsRecordId:rec.id});saveNotes();addPetReward({calm:2,vitality:2});$("#feelingModal").hidden=true;$("#burnsModal").hidden=true;pendingCompletionContext=null;launchConfetti();renderPending();showToast("这件事完成了。")}
+$("#saveFeelingButton").addEventListener("click",()=>finishBurns(false));$("#skipFeelingButton").addEventListener("click",()=>finishBurns(true));
+
+function saveSleepRecords(){localStorage.setItem(SLEEP_KEY,JSON.stringify(sleepRecords))}
+function todayKey(){return dateKey(Date.now())}
+function todayTraceItems(){const key=todayKey();return notes.filter(n=>dateKey(n.createdAt)===key).slice(0,8)}
+function renderTodaySummary(){const box=$("#todaySummary");if(!box)return;const list=todayTraceItems();box.innerHTML="";if(!list.length){box.innerHTML='<div class="today-summary-empty">今天还没有正式记录。可以补充一件已经发生的小事。</div>';return}list.forEach(item=>{const div=document.createElement("div");div.className="today-summary-item";div.textContent=item.text;box.appendChild(div)})}
+function sleepRecordForToday(type){return sleepRecords.find(r=>r.date===todayKey()&&r.type===type)}
+function setSleepScene(mode){const card=$("#sleepSceneCard"),win=$("#sleepWindow");if(!card||!win)return;card.classList.remove("awake","asleep");win.classList.remove("awake","asleep");if(mode){card.classList.add(mode);win.classList.add(mode)}$("#sleepSceneText").textContent=mode==="awake"?"窗帘已经拉开。小团和你一起醒来了。":mode==="asleep"?"灯已经关好，小团盖着毯子休息了。":"小团正在房间里等你。"}
+function renderSleepPage(){renderTodaySummary();renderSleepCalendar();if(sleepRecordForToday("evening"))setSleepScene("asleep");else if(sleepRecordForToday("morning"))setSleepScene("awake");else setSleepScene("");const isAndroid=typeof AndroidBridge!=="undefined"&&typeof AndroidBridge.saveReminderSettings==="function";$("#mobileReminderCard").hidden=!isAndroid;if(isAndroid){try{const saved=JSON.parse(AndroidBridge.getReminderSettings()||"{}");$("#morningReminderTime").value=saved.morningTime||"07:30";$("#eveningReminderTime").value=saved.eveningTime||"23:30";$("#morningReminderEnabled").checked=!!saved.morningEnabled;$("#eveningReminderEnabled").checked=!!saved.eveningEnabled}catch(e){}}}
+$("#addEndDayThingButton").addEventListener("click",()=>{const text=$("#endDayTinyThing").value.trim();if(!text){showToast("先写下一件小事。");return}notes.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),createdAt:Date.now(),text,mood:"",type:"随手记"});saveNotes();$("#endDayTinyThing").value="";addPetReward({connection:1,calm:1});renderTodaySummary();showToast("已经加到今天。")});
+$("#wakePetButton").addEventListener("click",()=>{if(!sleepRecordForToday("morning")){sleepRecords.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),date:todayKey(),createdAt:Date.now(),type:"morning"});notes.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),createdAt:Date.now(),text:"☀ 我起床了，和小团一起拉开了窗帘。",mood:"",type:"值得留下的瞬间"});saveSleepRecords();saveNotes();addPetReward({vitality:2})}setSleepScene("awake");renderSleepCalendar();launchConfetti();showToast("早上好。")});
+$("#endDayButton").addEventListener("click",()=>{if(!sleepRecordForToday("evening")){const note=$("#endDayNote").value.trim();sleepRecords.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),date:todayKey(),createdAt:Date.now(),type:"evening",note});notes.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),createdAt:Date.now(),text:`☾ 今天可以结束了。${note?` ${note}`:""}`,mood:"",type:"值得留下的瞬间"});saveSleepRecords();saveNotes();addPetReward({calm:2,connection:1})}setSleepScene("asleep");renderSleepCalendar();showToast("今天到这里就可以了。")});
+$("#notYetButton").addEventListener("click",()=>showToast("可以等你准备好。"));
+$("#prevSleepMonth").addEventListener("click",()=>{currentSleepMonth=new Date(currentSleepMonth.getFullYear(),currentSleepMonth.getMonth()-1,1);renderSleepCalendar()});$("#nextSleepMonth").addEventListener("click",()=>{currentSleepMonth=new Date(currentSleepMonth.getFullYear(),currentSleepMonth.getMonth()+1,1);renderSleepCalendar()});
+function renderSleepCalendar(){const grid=$("#sleepCalendarGrid");if(!grid)return;$("#sleepMonthTitle").textContent=new Intl.DateTimeFormat("zh-CN",{year:"numeric",month:"long"}).format(currentSleepMonth);grid.innerHTML="";const first=new Date(currentSleepMonth.getFullYear(),currentSleepMonth.getMonth(),1);const offset=(first.getDay()+6)%7;for(let i=0;i<offset;i++){const e=document.createElement("div");e.className="day-cell empty";grid.appendChild(e)}const days=new Date(currentSleepMonth.getFullYear(),currentSleepMonth.getMonth()+1,0).getDate();for(let day=1;day<=days;day++){const key=dateKey(new Date(currentSleepMonth.getFullYear(),currentSleepMonth.getMonth(),day,12));const dayRecords=sleepRecords.filter(r=>r.date===key);const cell=document.createElement("div");cell.className=`day-cell ${dayRecords.length?"has-note":""}`;const icons=[dayRecords.some(r=>r.type==="morning")?"☀":"",dayRecords.some(r=>r.type==="evening")?"☾":""].filter(Boolean).join("");cell.innerHTML=`<span class="day-number">${day}</span><span class="sleep-day-icons">${icons}</span>`;grid.appendChild(cell)}}
+$("#saveReminderSettingsButton").addEventListener("click",()=>{if(typeof AndroidBridge==="undefined"||typeof AndroidBridge.saveReminderSettings!=="function")return;const settings={morningTime:$("#morningReminderTime").value||"07:30",eveningTime:$("#eveningReminderTime").value||"23:30",morningEnabled:$("#morningReminderEnabled").checked,eveningEnabled:$("#eveningReminderEnabled").checked};AndroidBridge.saveReminderSettings(JSON.stringify(settings));$("#reminderStatusText").textContent="提醒设置已经保存。";showToast("提醒设置已经保存。")});
+window.openSleepInteraction=function(mode){switchView("sleep");setTimeout(()=>{if(mode==="morning"){$("#sleepSceneText").textContent="小团醒了。请拉开窗帘。";$("#wakePetButton").focus()}else{renderTodaySummary();$("#sleepSceneText").textContent="小团准备休息了。请帮它关灯并盖好毯子。";$("#endDayButton").focus()}},120)};
+
+function buildBackup(){return{version:"1.4",exportedAt:new Date().toISOString(),notes,shares,pendingItems,burnsRecords,sleepRecords,pet,settings:{theme:localStorage.getItem(THEME_KEY),calendarMode:localStorage.getItem(MODE_KEY)}}}
+$("#exportFullButton").addEventListener("click",()=>{
+  const blob=new Blob([JSON.stringify(buildBackup(),null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download=`tiny-evidence-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);
+});
+async function readImport(){const f=$("#importFile").files[0];if(!f){showToast("请先选择备份文件。");return null}try{return JSON.parse(await f.text())}catch{showToast("这个文件无法读取。");return null}}
+function mergeById(a=[],b=[]){const map=new Map(a.map(x=>[x.id,x]));b.forEach(x=>{if(!map.has(x.id))map.set(x.id,x)});return[...map.values()]}
+$("#mergeImportButton").addEventListener("click",async()=>{const d=await readImport();if(!d)return;notes=mergeById(notes,d.notes);shares=mergeById(shares,d.shares);pendingItems=mergeById(pendingItems,d.pendingItems);burnsRecords=mergeById(burnsRecords,d.burnsRecords);sleepRecords=mergeById(sleepRecords,d.sleepRecords);if(d.pet){for(const k of ["curiosity","creativity","vitality","calm","connection"])pet[k]=Math.max(pet[k]||0,d.pet[k]||0);if(!pet.name&&d.pet.name)pet.name=d.pet.name}saveNotes();saveShares();savePending();saveBurns();saveSleepRecords();savePet();updatePetVisual();showToast("已经合并导入。")});
+$("#replaceImportButton").addEventListener("click",async()=>{const d=await readImport();if(!d)return;if(!confirm("当前设备中的内容将被替换。此操作无法撤销。"))return;notes=d.notes||[];shares=d.shares||[];pendingItems=d.pendingItems||[];burnsRecords=d.burnsRecords||[];sleepRecords=d.sleepRecords||[];pet=d.pet||pet;saveNotes();saveShares();savePending();saveBurns();saveSleepRecords();savePet();updatePetVisual();showToast("已经替换并恢复。")});
+
 
 function renderTraces(){
   renderCalendar(); renderCollection(); renderVisuals(); renderNotes();
@@ -163,14 +303,16 @@ function renderNotes(){
   empty.style.display=filtered.length?"none":"grid";
   filtered.forEach(n=>{
     const a=document.createElement("article"); a.className="note-card";
-    a.innerHTML=`<div class="note-meta"><span>${formatDate(n.createdAt)}</span><span>${escapeHtml(n.type)}${n.mood?` · ${escapeHtml(n.mood)}`:""}</span></div><p class="note-body">${escapeHtml(n.text)}</p><button class="delete-note" data-id="${n.id}">删除</button>`;
+    const record=n.burnsRecordId?burnsRecords.find(r=>r.id===n.burnsRecordId):null; a.innerHTML=`<div class="note-meta"><span>${formatDate(n.createdAt)}</span><span>${escapeHtml(n.type)}${n.mood?` · ${escapeHtml(n.mood)}`:""}</span></div><p class="note-body">${escapeHtml(n.text)}</p>${burnsDetailHtml(record)}<button class="delete-note" data-id="${n.id}">删除</button>`;
     list.appendChild(a);
   });
 }
+function feelingEmoji(score){return({1:"😣",2:"😕",3:"😐",4:"🙂",5:"😄"})[score]||""}
+function burnsDetailHtml(record){if(!record)return"";return `<div class="burns-comparison-detail"><p class="eyebrow">反拖延记录</p><p><b>启动小步骤：</b>${escapeHtml(record.tinyStep||"")}</p><div class="comparison-grid"><div class="comparison-item"><small>困难程度</small><h3>${record.predDifficulty}% → ${record.actualDifficulty}%</h3></div><div class="comparison-item"><small>满意程度</small><h3>${record.predSatisfaction}% → ${record.actualSatisfaction}%</h3></div></div>${record.actualTime?`<p><b>实际投入时间：</b>${escapeHtml(record.actualTime)}</p>`:""}${record.feelingScore?`<div class="burns-feeling-line"><b>完成后的感受：</b><span>${feelingEmoji(record.feelingScore)}</span></div>`:""}${record.feelingNote?`<p class="burns-feeling-note">${escapeHtml(record.feelingNote)}</p>`:""}</div>`}
 function openDay(key,list){
   $("#dayModalDate").textContent=formatDate(key+"T12:00:00");
   const box=$("#dayModalList"); box.innerHTML="";
-  list.forEach(n=>{ const a=document.createElement("article"); a.className="note-card"; a.innerHTML=`<div class="note-meta"><span>${escapeHtml(n.type)}</span><span>${escapeHtml(n.mood||"")}</span></div><p class="note-body">${escapeHtml(n.text)}</p>`; box.appendChild(a); });
+  list.forEach(n=>{ const a=document.createElement("article"); a.className="note-card"; const record=n.burnsRecordId?burnsRecords.find(r=>r.id===n.burnsRecordId):null; a.innerHTML=`<div class="note-meta"><span>${escapeHtml(n.type)}</span><span>${escapeHtml(n.mood||"")}</span></div><p class="note-body">${escapeHtml(n.text)}</p>${burnsDetailHtml(record)}`; box.appendChild(a); });
   $("#dayModal").hidden=false;
 }
 $$("[data-close-day]").forEach(x=>x.addEventListener("click",()=>$("#dayModal").hidden=true));
@@ -252,19 +394,10 @@ $("#shrinkSuggestionButton").addEventListener("click",()=>{
   $("#suggestionText").textContent="把它缩小到只做第一个动作，或者只花一分钟。之后可以停止。";
 });
 
-$("#exportButton").addEventListener("click",()=>{
-  const json=JSON.stringify(notes,null,2);
-  if(window.AndroidBridge&&typeof window.AndroidBridge.exportNotes==="function"){
-    window.AndroidBridge.exportNotes(json);
-    return;
-  }
-  const blob=new Blob([json],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
-  a.href=url;a.download=`tiny-evidence-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);
-});
 $("#clearButton").addEventListener("click",()=>{
   if(!notes.length)return;
   if(!confirm("确定清空全部内容吗？此操作无法撤销。"))return;
-  notes=[];saveNotes();closeDrawer();renderTraces();renderMemory();showToast("内容已经清空。");
+  notes=[];shares=[];pendingItems=[];burnsRecords=[];sleepRecords=[];saveNotes();saveShares();savePending();saveBurns();saveSleepRecords();closeDrawer();renderTraces();renderPending();renderMemory();showToast("内容已经清空。");
 });
 
 

@@ -1,16 +1,15 @@
-# Tiny Evidence Android
+# Tiny Evidence Android 1.4
 
-这是 Tiny Evidence 1.1 的 Android WebView 封装工程。
+这是可直接上传到 GitHub、使用 GitHub Actions 构建 APK 的 Android 项目。
 
-## 用 Android Studio 生成 APK
+## 手机版专属功能
+- 用户自定义早晨与晚间时间。
+- 早晨发送“我起床了”，晚间发送“我要睡觉了”。
+- 点击通知会打开早晚陪伴页面。
+- 早晨需要拉开窗帘；晚间需要关灯并盖好毯子。
+- 提醒使用 Android 本地 AlarmManager，不依赖服务器；系统省电策略可能造成轻微延迟。
+- Android 13 及以上首次开启提醒时需要允许通知权限。
+- 手机重启或应用更新后会恢复已开启的提醒。
 
-1. 安装 Android Studio。
-2. 选择“Open”，打开本文件夹。
-3. 等待 Gradle 同步和 SDK 组件下载完成。
-4. 选择 `Build > Build Bundle(s) / APK(s) > Build APK(s)`。
-5. APK 通常生成在：
-   `app/build/outputs/apk/debug/app-debug.apk`
-
-## 数据
-
-网页内容保存在 Android WebView 的本地存储中。卸载 App 或清除 App 数据会删除记录。菜单中的导出按钮会打开 Android 文件保存窗口。
+## 构建
+项目已包含 `.github/workflows/build-apk.yml`。上传全部文件到 GitHub 仓库后，在 Actions 中运行 Build Android APK。
